@@ -38,10 +38,32 @@ def updated()
 
 def initialize()
 {   
-	if (now() < timeToday(timeOfDay, location.timeZone).time) {
+	subscribe(location)
+    changedLocationMode (location.mode)
+}
+   
+def changedLocationMode(evt)
+{
+	log.debug "MODE TRIGGERED: changedLocationMode: $evt"
+    if (correctMode())
+    {
+    	initializeSchedule()
+    }
+    else
+    {
+    	unschedule()
+        sendNotificationEvent("Good Night inactive in mode $location.mode")
+    }
+}
+    
+def initializeSchedule()
+{
+	if (now() < timeToday(timeOfDay, location.timeZone).time) 
+    {
     	resetSchedule()
     }
-    else {
+    else 
+    {
     	setSchedule()
     }
 }
@@ -52,6 +74,7 @@ private setSchedule()
 	unschedule()
     state.wasOn = (switch1.currentValue('power') > 5)
     log.debug "Setting schedule for short intervals"
+    sendNotificationEvent("Good Night starting frequent polling")
 	schedule("0 0/1 * * * ?", 'scheduleCheck')
 }
 
@@ -62,6 +85,7 @@ private resetSchedule()
     schedule(timeOfDay, 'setSchedule')
     state.wasOn = false
     log.debug "Setting schedule to run at $timeOfDay"
+    sendNotificationEvent("Good Night will run at $timeOfDay")
 }
 
 def scheduleCheck()
