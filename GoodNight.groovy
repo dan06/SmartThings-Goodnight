@@ -2,24 +2,28 @@
  *  Good Night
  *
  *  Author: dpvorster
- *  Date: 2014-12-27
+ *  Date: 2015-07-07
  */
 definition(
     name: "Good Night",
-    namespace: "smartthings",
-    author: "SmartThings",
+    namespace: "dpvorster",
+    author: "dpvorster",
     description: "Changes mode when no power is detected on a switch after a specific time at night.",
     category: "Convenience",
     iconUrl: "https://s3.amazonaws.com/smartapp-icons/ModeMagic/good-night.png",
     iconX2Url: "https://s3.amazonaws.com/smartapp-icons/ModeMagic/good-night@2x.png"
 )
 
-preferences {
+preferences 
+{
 	section("When there is no power consumed by this device") {
 		input "switch1", "capability.powerMeter", title: "Where?"
 	}
 	section("After this time of day") {
-		input "timeOfDay", "time", title: "Time?"
+		input "startTime", "time", title: "Time?", required: true
+	}
+	section("Until this time of day") {
+		input "endTime", "time", title: "Time?", required: true
 	}
     section("Only when mode is") {
     	input "modes", "mode", title: "Modes?", multiple: true, required: false
@@ -38,70 +42,33 @@ def updated()
 
 def initialize()
 {   
-	subscribe(location)
-    changedLocationMode (location.mode)
+	unsubscribe()
+	subscribe (switch1, "power", eventHandler)
+    log.debug "Subscribed to power event for $switch1"
 }
-   
-def changedLocationMode(evt)
+
+def eventHandler(evt)
 {
-	log.debug "MODE TRIGGERED: changedLocationMode: $evt"
-    if (correctMode())
+	if (!correctTime() || !correctMode())
     {
-    	initializeSchedule()
+    	log.debug "eventHandler, nothing to do"
+    	return
     }
-    else
-    {
-    	unschedule()
-        sendNotificationEvent("Good Night inactive in mode $location.mode")
-    }
-}
     
-def initializeSchedule()
-{
-	if (now() < timeToday(timeOfDay, location.timeZone).time) 
-    {
-    	resetSchedule()
-    }
-    else 
-    {
-    	setSchedule()
-    }
-}
-
-// Start polling more frequently
-private setSchedule()
-{
-	unschedule()
-    state.wasOn = (switch1.currentValue('power') > 5)
-    log.debug "Setting schedule for short intervals"
-    sendNotificationEvent("Good Night starting frequent polling")
-	schedule("0 0/1 * * * ?", 'scheduleCheck')
-}
-
-// Reset schedule for the next day
-private resetSchedule()
-{
-	unschedule()
-    schedule(timeOfDay, 'setSchedule')
-    state.wasOn = false
-    log.debug "Setting schedule to run at $timeOfDay"
-    sendNotificationEvent("Good Night will run at $timeOfDay")
-}
-
-def scheduleCheck()
-{
-	log.debug "scheduleCheck, wasOn=$state.wasOn"
+	log.debug "eventHandler, wasOn=$state.wasOn"
     
     // Check if switch is on
-    if (! state.wasOn) {
+    if (! state.wasOn) 
+    {
     	state.wasOn = (switch1.currentValue('power') > 5)
     }
 	
-	if (correctTime() && correctMode() && state.wasOn)
+	if (state.wasOn)
     {
 		if (isPowerOff())
         {
 			takeActions()
+            state.wasOn = false;
 		}
 	}
 } 
@@ -110,19 +77,17 @@ private takeActions()
 {
     log.debug "Executing good night"
 	location.helloHome.execute("Good Night!")
-    resetSchedule()
 }
 
 private correctTime() 
 {
 	def t0 = now()
-	def startTime = timeToday(timeOfDay, location.timeZone)
-	if (t0 >= startTime.time) {
-		true
-	} else {
-		log.debug "The current time of day ($t0), is not in the correct time window ($startTime):  doing nothing"
-		false
-	}
+	def start = timeToday(startTime, location.timeZone)
+	def end = timeToday(endTime, location.timeZone)
+    
+    def result = end.time < start.time ? (t0 >= start.time || t0 < end.time) : (t0 >= start.time && t0 <= end.time)
+    log.debug "correctTime = $result"
+	result
 }
 
 private correctMode()
