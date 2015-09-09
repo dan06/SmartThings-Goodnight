@@ -2,13 +2,13 @@
  *  Good Night
  *
  *  Author: dpvorster
- *  Date: 2015-07-07
+ *  Date: 2015-09-09
  */
 definition(
     name: "Good Night",
     namespace: "dpvorster",
     author: "dpvorster",
-    description: "Changes mode when no power is detected on a switch after a specific time at night.",
+    description: "Runs a routine when no power is detected on a power meter switch after a specific time at night.",
     category: "Convenience",
     iconUrl: "https://s3.amazonaws.com/smartapp-icons/ModeMagic/good-night.png",
     iconX2Url: "https://s3.amazonaws.com/smartapp-icons/ModeMagic/good-night@2x.png"
@@ -16,19 +16,35 @@ definition(
 
 preferences 
 {
-	section("When there is no power consumed by this device") {
-		input "switch1", "capability.powerMeter", title: "Where?"
-	}
-	section("After this time of day") {
-		input "startTime", "time", title: "Time?", required: true
-	}
-	section("Until this time of day") {
-		input "endTime", "time", title: "Time?", required: true
-	}
-    section("Only when mode is") {
-    	input "modes", "mode", title: "Modes?", multiple: true, required: false
-    }
+    page(name: "settings", title: "Settings")
 }
+
+def settings() 
+{
+    dynamicPage(name: "settings", uninstall: true) 
+    {		
+        section("When there is no power consumed by this device") {
+            input "switch1", "capability.powerMeter", title: "Where?"
+        }
+        section("Between these times") {
+            input "startTime", "time", title: "Start time?", required: true
+            input "endTime", "time", title: "End time?", required: true
+        }
+        def phrases = location.helloHome?.getPhrases()*.label
+        if (phrases) 
+        {
+            phrases.sort()
+            section("Then run this routine") {
+                log.trace phrases
+                input "HHRoutine", "enum", title: "Routine", required: true, options: phrases, refreshAfterSelection:true
+            }
+        }
+        section ("") {
+            label title: "Assign a name", required: false
+            input "modes", "mode", title: "Set for specific mode(s)", multiple: true, required: false
+        }
+    }
+} 
 
 def installed() 
 {
@@ -75,8 +91,10 @@ def eventHandler(evt)
 
 private takeActions() 
 {
-    log.debug "Executing good night"
-	location.helloHome.execute("Good Night!")
+    //log.debug "Executing good night"
+	//location.helloHome.execute("Good Night!")
+    log.debug "Executing \"$settings.HHRoutine\""
+    location.helloHome.execute(settings.HHRoutine)
 }
 
 private correctTime() 
