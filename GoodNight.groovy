@@ -21,7 +21,7 @@ preferences
 
 def settings() 
 {
-    dynamicPage(name: "settings", uninstall: true) 
+    dynamicPage(name: "settings", install: true, uninstall: true) 
     {		
         section("When there is no power consumed by this device") {
             input "switch1", "capability.powerMeter", title: "Where?"
